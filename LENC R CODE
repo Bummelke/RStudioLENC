@@ -1,0 +1,476 @@
+PlantCounts <- readxl::read_excel("Plant_counts.xlsx")
+total_counts_plant <- head(PlantCounts$`Total Count`,-1)
+plant_names <- PlantCounts[,1]
+
+sorted_PlantCounts <- PlantCounts[order(PlantCounts$`Total Count`, decreasing = TRUE), ]
+top20 <- data.frame(Names = sorted_PlantCounts[2:21,1], Counts = sorted_PlantCounts[2:21,199])
+top20<- cbind(top20)
+top20exotic <- exotic_plants[order(exotic_plants$`Total Count`, decreasing = TRUE),]
+top20exotic <- data.frame(Names = exotic_plants[2:21,1], Counts = top20exotic[2:21, 199])
+top20
+top20exotic
+#total plants by location
+total_plants_by_location <- PlantCounts[280,2:198]
+median_total_plants_per_location <- median(unlist(total_plants_by_location))
+sd_total_plants_by_location <- sd(unlist(total_plants_by_location))
+
+#total native species
+native_plants <- PlantCounts[1:226,]
+
+median_native <- median(native_plants$`Total Count`)
+sd_native <- sd(native_plants$`Total Count`)
+different_native_plants <- nrow(native_plants)
+
+#exotic plants
+exotic_plants <- PlantCounts[226:279,]
+temp<-exotic_plants[,2:199]
+temp <- sapply(temp, as.numeric)
+temp[is.na(temp)] <- 0
+sumexoticplantspertransit <- apply(temp, 2, sum)
+sumexoticplantspertransit <- sumexoticplantspertransit[1:197]
+  
+median_exotic <- mean(exotic_plants$`Total Count`)
+sd_exotic <- sd(exotic_plants$`Total Count`)
+different_exotic_plants <- nrow(exotic_plants)
+
+#percents
+percent_of_total_native <- paste(round((different_native_plants/(different_exotic_plants+different_native_plants))*100,1),"%")
+percent_of_total_exotic <- paste(round((different_exotic_plants/(different_exotic_plants+different_native_plants))*100,1),"%")
+percent_of_median_exotic <- paste(round((median_exotic/(mean_exotic+median_native))*100,1),"%")
+percent_of_median_native <- paste(round((median_native/(median_exotic+median_native))*100,1),"%")
+
+library(ggplot2)
+#plot the total species of plants
+ggdata1 <- data.frame(Plant_Type = c("Native","Exotic"),
+                      Amount = c(different_native_plants, different_exotic_plants),
+                      Label = c(percent_of_total_native, percent_of_total_exotic) # Fixed label formatting
+)
+
+ggplot(ggdata1, aes(x = Plant_Type, y = Amount, fill = Plant_Type)) +
+  geom_bar(stat = "identity", width = 0.9) +
+  geom_text(aes(label = paste0(Label)),  # Adding "%" to the labels
+            vjust = -0.5, hjust = 0.5, size = 5) +  # Adjusted text alignment and size
+  labs(
+    title = "Total Number of Native and Exotic Species of Plants",
+    y = "Amount of Plant Species",
+    x = "Plant Type"
+  ) +
+  theme_minimal() +
+  scale_fill_manual(values = c("red", "green")) +
+  theme(
+    plot.title = element_text(size = 16, face = "bold"),  # Increase title size for readability
+    axis.title = element_text(size = 14),                # Increase axis title size
+    axis.text = element_text(size = 12)                  # Increase axis text size
+  )
+#create data for the ggplot
+ggdata2 <- data.frame(Plant_Type = c("Native", "Exotic"),
+                      Median = c(median_native, median_exotic),
+                      SD = c(sd_native, sd_exotic),
+                      Label = c(round(median_native,1), round(median_exotic,1))
+)
+
+ggplot(ggdata2, aes(x = Plant_Type, y = Median, fill = Plant_Type)) + 
+  geom_bar(stat = "identity", width = 0.6) +
+  geom_errorbar(aes(ymin = Median - SD, ymax = Median + SD), width = 0.2, color = "black") + # Added black for better contrast
+  geom_text(aes(label = paste0(Label)), vjust = -0.5, size = 5, hjust = 1.2) +          # Centered and added % sign
+  labs(
+    title = "Median Number of Native and Exotic Plants With SD",
+    y = "Median Number of Plants",
+    x = "Plant Type"
+  ) +
+  theme_minimal() +
+  scale_fill_manual(values = c("red", "green")) +
+  theme(
+    plot.title = element_text(size = 16, face = "bold"),  # Larger title text
+    axis.title = element_text(size = 14),                # Larger axis title text
+    axis.text = element_text(size = 12)                  # Larger axis tick text
+  )
+
+
+
+library("vegan")
+#!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+shannon_indexes <- c(shannon_diversityER, shannonEU, shannon_diversityNR, shannon_diversityNU)
+#!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+shannon_total <- diversity(PlantCounts$`Total Count`[1:279], index = 'shannon')
+shannontransitmean <- mean(shannon_per_transit)
+shannon_difference <- abs(shannon_per_transit-shannontransitmean)
+sorted_shannon_difference <- order(shannon_difference, decreasing = TRUE)
+bigdiffer <- sorted_shannon_difference[1:10]
+mostdiffer <- shannon_per_transit[bigdiffer]
+mostdiffertransits <- exotic_plants[,c(79,192,190,70,14,31,4,8,9,39)]
+mostdiffertransits <- cbind(exotic_plants$Names, mostdiffertransits)
+mostdiffertransitsclean <- mostdiffertransits[rowSums(is.na(mostdiffertransits[,-1]))!=(ncol(mostdiffertransits)-1),]
+mostdiffertransitsclean[,-1][is.na(mostdiffertransitsclean[,-1])] <- 0
+mostdiffertransitsclean
+
+
+# Create the data frame for Shannon index
+shannon_data <- data.frame(Group = c("Exotic Urban", "Exotic Rural", "Native Urban", "Native Rural"),
+                           Shannon_index = shannon_indexes)
+
+# Create the bar plot
+ggplot(shannon_data, aes(x = Group, y = Shannon_index, fill = Group)) +
+  geom_bar(stat = "identity", width = 0.6) +  # Adjust bar width for better spacing
+  geom_text(aes(label = round(Shannon_index, 2)), vjust = -0.5, size = 5, color = "black") +  # Add value labels above bars
+  labs(title = "Shannon Diversity by Plant Type and Location", 
+       y = "Shannon Index", 
+       x = "Group") +
+  scale_y_continuous(limits = c(0, 6)) +  # Set y-axis limits from 0 to 6
+  theme_minimal(base_size = 14) +  # Base font size for better readability
+  theme(
+    plot.title = element_text(size = 18, face = "bold"),  # Title styling
+    axis.title = element_text(size = 16),                  # Axis title styling
+    axis.text = element_text(size = 14),                   # Axis text styling
+    panel.grid.major = element_line(color = "gray80"),      # Light grid for better readability
+    panel.grid.minor = element_line(color = "gray90"),       # Lighter minor grid lines
+    legend.position = "none"  # Remove legend if not needed
+  )
+
+
+#-----------------------nog meer shannon------------------------------------------
+Urban_plants <- UrbanNature[103:197,2:280]
+Rural_plants <- UrbanNature[0:102,2:280]
+Urban_plants_noname <- as.data.frame(Urban_plants, stringsAsFactors = FALSE)
+colnames(Urban_plants_noname) <- c("", "")
+Urban_plants_noname
+totals_urban_plants <- Urban_plants_noname %>%
+  summarise(across(everything(), ~sum(.x,na.rm=TRUE)))
+
+
+library(dplyr)
+
+UrbanNature <- readxl::read_excel("urbanruralcount.xlsx")#tijd om de excel van de urban vs nature te importen baby!
+#nativeurban------------------------------------------------------------------------------------------------
+Native_Urban <- UrbanNature[103:197,1:227]
+Native_Urban
+Native_Urban <- Native_Urban %>%
+  mutate(across(where(is.character), ~ as.numeric(.)))
+Native_Urban <- Native_Urban[!sapply(Native_Urban,is.na)]
+totalNU <- sum(Native_Urban)   
+medianNU <- median(Native_Urban)
+sdNU <- sd(Native_Urban)
+
+#nativerural----------------------------------------------------------------------------------------------
+Native_Rural <- UrbanNature[0:102,1:227]
+Native_Rural <- Native_Rural %>%
+  mutate(across(where(is.character), ~ as.numeric(.)))
+Native_Rural <- Native_Rural[!sapply(Native_Rural,is.na)]
+totalNR <- sum(Native_Rural, na.rm=TRUE)
+medianNR <- median(Native_Rural)
+sdNR <- sd(Native_Rural)
+
+#exoticrural ---------------------------------------------------------------------------------------
+Exotic_Rural <- UrbanNature[1:102,228:280]
+Exotic_Rural <- Exotic_Rural %>%
+  mutate(across(where(is.character), ~ as.numeric(.)))
+Exotic_Rural <- Exotic_Rural[!sapply(Exotic_Rural,is.na)]
+totalER <-sum(Exotic_Rural, na.rm=TRUE) 
+medianER <- median(Exotic_Rural)
+sdER <- sd(Exotic_Rural)
+
+#exoticurban-----------------------------------------------------------------------------------
+Exotic_Urban <- UrbanNature[103:197,228:280]
+Exotic_Urban <- Exotic_Urban %>%
+  mutate(across(where(is.character), ~ as.numeric(.)))
+Exotic_Urban <- Exotic_Urban[!sapply(Exotic_Urban,is.na)]
+totalEU <- sum(Exotic_Urban, na.rm=TRUE) 
+medianEU <- median(Exotic_Urban)
+sdEU <- sd(Exotic_Urban)
+
+data3 <- data.frame(
+  Type = rep(c("Native", "Native", "Exotic", "Exotic"), each = 10),
+  Environment = rep(c("Urban", "Nature"), times = 20),
+  Median = c(medianER, medianEU, medianNR, medianNU),
+  SD = c(sdER, sdEU, sdNR, sdNU)
+)
+
+# Create the boxplot for urban and rural medians and sd's (might need to use means bc this is fucked)
+ggplot(data3, aes(x = interaction(Type, Environment), y = Median, fill = Type))+
+  geom_boxplot() +
+  geom_errorbar(aes(ymin = Median-SD, ymax = Median+SD), width=0.2)+
+  labs(title = "Boxplot of Plant Counts by Type and Environment",
+       x = "Plant Type and Environment",
+       y = "Count")+
+  theme_minimal()
+
+library("MASS")
+#negative binomial regression
+Exotic_Urban2 <- data.frame(Count = c(Exotic_Urban), Location = "Urban", Plant_type = "Exotic")
+Exotic_Rural2 <- data.frame(Count = c(Exotic_Rural), Location = "Rural", Plant_type = "Exotic")
+Native_Urban2 <- data.frame(Count = c(Native_Urban), Location = "Urban", Plant_type = "Native")
+Native_Rural2 <- data.frame(Count = c(Native_Rural), Location = "Rural", Plant_type = "Native")
+combined_nbr <- rbind(Exotic_Urban2, Exotic_Rural2, Native_Urban2, Native_Rural2)
+
+#negative binomial regression
+nbr <- glm.nb(Count~Location+Plant_type, data=combined_nbr)
+
+
+summary(nbr)
+histogramplot <- ggplot(combined_nbr, aes(x=Count)) +
+  geom_histogram(binwidth = 5, fill = "green", color = "black", alpha = 0.7) +
+  facet_grid(Location ~ Plant_type) +
+  labs(
+    title = "Histograms of Plant Counts by Location and Plant Type",
+    x = "Plant Count",
+    y = "Frequency"
+  ) +
+  theme_minimal() +
+  theme(
+    plot.title = element_text(size = 16, face = "bold"),       # Title size and bold text
+    axis.title = element_text(size = 14),                      # Axis title size
+    axis.text = element_text(size = 12),                       # Axis tick text size
+    strip.text = element_text(size = 13, face = "bold"),       # Facet label text size and bold
+    axis.text.x = element_text(angle = 45, hjust = 1)          # Rotate x-axis labels if crowded
+  )
+
+histogramplot
+
+
+#Biodiversity vs invasives per location ------------------------------------------------------------------------
+#so total seen invasives is x, total species per transit is y
+
+totalnativepertransit <- native_plants %>%
+  summarise(across(everything(), ~sum(!is.na(.))))
+totalnativepertransit <- totalnativepertransit[,2:198]  
+
+totalexoticpertransit <- exotic_plants%>%
+  summarise(across(everything(), ~sum(!is.na(.))))
+totalexoticpertransit <- totalexoticpertransit[,2:198]
+
+totalplantspertransittemp <- PlantCounts[1:279,]
+totalplantspertransit <- totalplantspertransittemp %>%
+  summarise(across(everything(),~sum(!is.na(.))))
+totalplantspertransit
+totalplantspertransit <- totalplantspertransit[,2:198]
+
+
+totalexoticpertransit <- totalexoticpertransit %>%
+  mutate(across(where(is.character), ~ as.numeric(.)))
+totalnativepertransit <- totalnativepertransit %>%
+  mutate(across(where(is.character), ~ as.numeric(.)))
+
+# run totalexoticpertransit against total shannon per transit
+library(dplyr)
+
+PlantCounts[1:279,2:198] <- sapply(PlantCounts[1:279,2:198], as.numeric) 
+#Convert character columns to numeric (excluding non-numeric columns)
+PlantCounts[] <- lapply(PlantCounts, function(col) {
+  #Convert to numeric, return NA if not possible
+  as.numeric(as.character(col))
+})
+#Check for NA's and replace with 0
+PlantCounts[is.na(PlantCounts)] <- 0
+
+shan <- function(x){ diversity(x, index = "shannon")}
+shannon_per_transit <- apply(PlantCounts[,-1],2, shan)
+shannon_per_transit <- shannon_per_transit[1:197]
+sumexoticplantspertransit[198]
+
+
+linearmodel_shannon <- lm(Shannon_Index ~ exot, data = data_shannon_exotic)
+
+# Extract the p-value from the model summary
+model_summary_shannon <- summary(linearmodel_shannon)
+p_value_shannon <- model_summary_shannon$coefficients[2, 4]  # Extract p-value for the slope
+
+# Create the plot
+ggplot(data_shannon_exotic, aes(x = exot, y = Shannon_Index)) +
+  geom_point(color = "blue", size = 2) +  # Larger points with transparency
+  geom_smooth(method = "lm", color = "red", se = TRUE, size = 1) +  # Thicker regression line with confidence interval
+  labs(
+    title = "Shannon Index vs Exotic Plants per Transit",
+    x = "Number of Exotic Plants Found per Index",
+    y = "Shannon Index per Transit"
+  ) +
+  theme_minimal(base_size = 14) +  # Base size for better readability
+  theme(
+    plot.title = element_text(size = 18, face = "bold"),  # Title styling
+    axis.title = element_text(size = 16),                  # Axis title styling
+    axis.text = element_text(size = 14),                   # Axis text styling
+    panel.grid.major = element_line(color = "gray80"),      # Light grid for better readability
+    panel.grid.minor = element_line(color = "gray90")
+  ) +
+  # Annotate the p-value on the plot
+  annotate("text", x = max(data_shannon_exotic$exot) * 0.8, 
+           y = max(data_shannon_exotic$Shannon_Index) * 0.4,
+           label = paste("p-value:", format(p_value_shannon, digits = 3)), 
+           size = 5, color = "black")
+
+
+
+
+
+# Fit the linear model
+linearmodel <- lm(unlist(totalplantspertransit) ~ unlist(totalexoticpertransit), data = lrdata)
+
+# Extract the p-value from the model summary
+model_summary <- summary(linearmodel)
+model_summary
+p_value <- model_summary$coefficients[2, 4]  # Extract p-value for the slope (2nd row, 4th column)
+# Prepare data frame for plotting
+lrdata <- data.frame(Biodiversity = unlist(totalplantspertransit), Exotic = unlist(totalexoticpertransit))
+
+# Create the plot
+ggplot(lrdata, aes(x = Exotic, y = Biodiversity)) +
+  geom_point(color = "blue", size = 2) +  # Larger points with transparency
+  geom_smooth(method = 'lm', color = "red", se = TRUE, size = 1) +  # Thicker regression line
+  labs(
+    title = "Linear Regression: Exotic Plant Species vs Total Plant Species",
+    x = "Exotic Plant Species",
+    y = "Total Plant Species"
+  ) +
+  theme_minimal() +
+  theme(
+    plot.title = element_text(size = 16, face = "bold"),
+    axis.title = element_text(size = 14),
+    axis.text = element_text(size = 12),
+    panel.grid.major = element_line(color = "gray80"),  # Light grid for better readability
+    panel.grid.minor = element_line(color = "gray90")
+  ) +
+  # Annotate the p-value on the plot
+  annotate("text", x = max(lrdata$Exotic) * 0.8, y = max(lrdata$Biodiversity) * 0.05,
+           label = paste("p-value:", format(p_value, digits = 3)), size = 5, color = "black")
+
+
+
+
+
+totalexoticurban <- sum(Exotic_Urban)
+totalexoticrural <- sum(Exotic_Rural)
+
+# Create a data frame for plotting
+ploter2 <- data.frame(Location = c('Urban', 'Rural'), Totals = c(totalexoticurban, totalexoticrural))
+
+# Create the bar plot
+ggplot(ploter2, aes(x = Location, y = Totals)) +
+  geom_bar(stat = 'identity', width = 0.5, fill = "darkslategrey") +  # Adjust bar width
+  geom_text(aes(label = Totals), vjust = -0.5, size = 5, color = "black") +  # Add value labels above bars
+  labs(
+    title = "Total Counts of Exotic Plants in Urban and Rural Locations",
+    y = "Total Counts",
+    x = "Location"
+  ) +
+  theme_minimal(base_size = 14) +  # Base font size for better readability
+  theme(
+    plot.title = element_text(size = 18, face = "bold"),  # Title styling
+    axis.title = element_text(size = 16),                  # Axis title styling
+    axis.text = element_text(size = 14),                   # Axis text styling
+    panel.grid.major = element_line(color = "gray80"),      # Light grid for better readability
+    panel.grid.minor = element_line(color = "gray90")       # Lighter minor grid lines
+  )
+
+
+
+
+
+library(tidyr)
+
+Exotic_Urban3 <- UrbanNature[103:197,228:280]
+Exotic_Urban3 <- Exotic_Urban %>%
+  mutate(across(where(is.character), ~ as.numeric(.))) %>%
+  mutate(across(everything(), ~ replace_na(., 0)))      
+Exotic_Urban_sums <- unname(colSums(Exotic_Urban3, na.rm = TRUE))
+shannonEU <- diversity(Exotic_Urban_sums, index = "shannon")
+
+Exotic_Rural3 <- UrbanNature[1:102,228:280]
+Exotic_Rural3 <- Exotic_Rural3 %>%
+  mutate(across(where(is.character), ~ as.numeric(.))) %>%
+  mutate(across(everything(), ~ replace_na(., 0)))      
+Exotic_Rural_sums <- unname(colSums(Exotic_Rural3, na.rm = TRUE))
+shannonER <- diversity(Exotic_Rural_sums, index = "shannon")
+
+Native_Rural3 <- UrbanNature[0:102,1:227]
+Native_Rural3 <- Native_Rural3 %>%
+  mutate(across(where(is.character), ~ as.numeric(.))) %>%
+  mutate(across(everything(), ~ replace_na(., 0)))  
+Native_Rural_sums <- unname(colSums(Native_Rural3, na.rm=TRUE))
+
+Native_Urban3 <- UrbanNature[103:197,1:227]
+Native_Urban3 <- Native_Urban3 %>%
+  mutate(across(where(is.character), ~ as.numeric(.))) %>%
+  mutate(across(everything(), ~replace_na(.,0)))
+Native_urban_sums <- unname(colSums(Native_Urban3, na.rm = TRUE))
+total_urban_sums <- c(Exotic_Urban_sums, Native_urban_sums)       
+total_rural_sums <- c(Exotic_Rural_sums, Native_Rural_sums)
+
+
+total_rural_shannon <- diversity(total_rural_sums, index = "shannon") #total rural shannon
+total_urban_shannon <- diversity(total_urban_sums,index = "shannon") #total urban shannon
+total_urban_shannon
+
+total_shannons <- data.frame(Location = c("Urban Total","Rural Total", "Urban Exotic", "Rural Exotic"), Shannon = c(total_urban_shannon, total_rural_shannon, shannonEU, shannonER))
+shannon_per_location <- ggplot(total_shannons, aes(x = Location, y = Shannon, fill = Location))+
+  geom_bar(stat = "identity")+
+  labs(title = "Shannon index of both Urban and Rural Locations",
+       x = "Location",
+       y = "Shannon index")+
+  theme_minimal()
+shannon_per_location
+
+
+All_Info <- readxl::read_excel("All_Info.xlsx")
+copy <- All_Info
+copy <- subset(copy, select = -`Native specie`)
+copy <- copy[,4:286]
+copy <- copy[,-(2:4)]
+copy<- copy[-(1),]
+Tree_Info <- copy
+
+Tree_Info <- Tree_Info %>%
+  mutate(across(where(is.character), ~ as.numeric(.))) %>%
+  mutate(across(everything(), ~ replace_na(., 0)))  
+
+#shannon index per row
+TreeShannonNative <- apply(Tree_Info[1:197,2:227],1,shan)
+TreeShannonExotic <- apply(Tree_Info[1:197,228:280],1,shan)
+TreeShannonExotic<-as.vector(TreeShannonExotic)
+TreeShannonNative<-as.vector(TreeShannonNative)
+Tree_Info_Covers<-unlist(as.vector(Tree_Info[1:197,1]))
+Tree_Info_Covers <- ifelse(Tree_Info_Covers<1, Tree_Info_Covers*100, Tree_Info_Covers)
+
+TreePlot <- data.frame(Tree_Coverage = Tree_Info_Covers, ExoticShannon =  TreeShannonExotic, NativeShannon = TreeShannonNative)
+TreePlot <- subset(TreePlot, ExoticShannon != 0 & NativeShannon != 0)
+
+
+exotic_model <- lm(ExoticShannon ~ Tree_Coverage, data = TreePlot)
+exotic_pval <- summary(exotic_model)$coefficients[2, 4]  # Extract p-value for the slope
+
+TreeplotExotic <- ggplot(TreePlot) +
+  geom_point(aes(x = Tree_Coverage, y = ExoticShannon), color = "black", size = 4, alpha = 0.7) +  # Larger points with transparency
+  geom_smooth(aes(x = Tree_Coverage, y = ExoticShannon), method = "lm", se = TRUE, color = "black", size = 1.2) +  # Thicker regression line
+  labs(x = "Tree Coverage Percentage", y = "Exotic Shannon Index",
+       title = "Shannon Index of Exotic Plants vs. Tree Coverage (with Regression and SD)") +
+  annotate("text", x = max(TreePlot$Tree_Coverage) * 0.9, y = max(TreePlot$ExoticShannon) * 0,
+           label = paste("p-value:", format(exotic_pval, digits = 2)), size = 5, color = "black") +
+  theme_minimal(base_size = 14) +  # Base size for better readability
+  theme(
+    plot.title = element_text(size = 16, face = "bold"),  # Title styling
+    axis.title = element_text(size = 14),                  # Axis title styling
+    axis.text = element_text(size = 12),                   # Axis text styling
+    panel.grid.major = element_line(color = "gray80"),      # Light grid for better readability
+    panel.grid.minor = element_line(color = "gray90")       # Lighter minor grid lines
+  )
+
+# Print the Exotic Shannon plot
+print(TreeplotExotic)
+
+# Native Shannon Plot
+TreeplotNative <- ggplot(TreePlot) +
+  geom_point(aes(x = Tree_Coverage, y = NativeShannon), color = "black", size = 4, alpha = 0.7) +  # Larger points with transparency
+  geom_smooth(aes(x = Tree_Coverage, y = NativeShannon), method = "lm", se = TRUE, color = "black", size = 1.2) +  # Thicker regression line
+  labs(x = "Tree Coverage Percentage", y = "Native Shannon Index",
+       title = "Shannon Index of Native Plants vs. Tree Coverage (with Regression and SD)") +
+  annotate("text", x = max(TreePlot$Tree_Coverage) * 0.9, y = max(TreePlot$NativeShannon) * 0,
+           label = paste("p-value:", format(native_pval, digits = 2)), size = 5, color = "black") +
+  theme_minimal(base_size = 14) +  # Base size for better readability
+  theme(
+    plot.title = element_text(size = 16, face = "bold"),  # Title styling
+    axis.title = element_text(size = 14),                  # Axis title styling
+    axis.text = element_text(size = 12),                   # Axis text styling
+    panel.grid.major = element_line(color = "gray80"),      # Light grid for better readability
+    panel.grid.minor = element_line(color = "gray90")       # Lighter minor grid lines
+  )
+
+# Print the Native Shannon plot
+print(TreeplotNative)
